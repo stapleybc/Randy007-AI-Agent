@@ -16,24 +16,22 @@ def main():
     api_key=api_key,
     )
 
+
     parser = argparse.ArgumentParser(description="Chatbot")
     parser.add_argument("user_prompt", type=str, help="User prompt")
     args = parser.parse_args()
-
+    messages = [
+        {"role": "user", "content": args.user_prompt},
+    ]
     response = client.chat.completions.create(
     model="openrouter/free",
-    messages=[
-        {
-            "role": "user",
-            "content": args.user_prompt,
-        }
-    ],
+    messages = messages
     )
 
     if response.usage != None:
         print(f"Prompt tokens: {response.usage.prompt_tokens}\nResponse tokens: {response.usage.completion_tokens}"
         )
-       # print(f"Response tokens: {response.response_tokens}")
+
     print(response.choices[0].message.content)
 
 
