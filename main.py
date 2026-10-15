@@ -1,10 +1,11 @@
 import argparse
 import os
+import json
 
 from dotenv import load_dotenv
 from openai import OpenAI
 from prompts import system_prompt
-
+from call_function import available_functions
 
 def main():
     parser = argparse.ArgumentParser(description="Chatbot")
@@ -31,6 +32,7 @@ def main():
     model="openrouter/free",
     messages = messages,
     temperature=0,
+    tools=available_functions
     )
 
     if args.verbose:
@@ -39,7 +41,13 @@ def main():
                 print(f"Prompt tokens: {response.usage.prompt_tokens}")
                 print(f"Response tokens: {response.usage.completion_tokens}")
 
-    print(response.choices[0].message.content)
+    message = response.choices[0].message
+    if message.tool_calls:
+        for tool_call in message.tool_calls:
+            function_args = json.loads(tool_call.function.arguments or "{}")
+            print(f"Calling function: {tool_call.function.name}({function_args})")
+    elif not message.tool_calls:
+        print(response.choices[0].message.content)
 
 
 if __name__ == "__main__":
