@@ -1,13 +1,17 @@
 import argparse
 import os
-import json
+import sys
 
 from dotenv import load_dotenv
 from openai import OpenAI
-from prompts import system_prompt
-from call_function import available_functions, call_function
 
-def main():
+from call_function import available_functions, call_function
+from prompts import system_prompt
+
+MAX_ITERATIONS = 20
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(description="Chatbot")
     parser.add_argument("user_prompt", type=str, help="User prompt")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
@@ -28,21 +32,32 @@ def main():
         {"role": "user", "content": args.user_prompt},
     ]
 
-    response = client.chat.completions.create(
-        model="openrouter/free",
-        messages=messages,
-        temperature=0,
-        tools=available_functions,
-    )
-
     if args.verbose:
         print(f"User prompt: {args.user_prompt}")
-        if response.usage is not None:
+
+    for _ in range(MAX_ITERATIONS):
+        response = client.chat.completions.create(
+            model="openrouter/free",
+            messages=messages,
+            temperature=0,
+            tools=available_functions,
+        )
+
+        if args.verbose and response.usage is not None:
             print(f"Prompt tokens: {response.usage.prompt_tokens}")
             print(f"Response tokens: {response.usage.completion_tokens}")
 
-    message = response.choices[0].message
-    if message.tool_calls:
+        # The assistant's turn goes into the history first.
+        message = response.choices[0].message
+        messages.append(message)
+
+        # No tool calls means the model is done.
+        if not message.tool_calls:
+            print("Final response:")
+            print(message.content)
+            return
+
+        # One tool message per tool call, appended after the assistant message.
         for tool_call in message.tool_calls:
             result_message = call_function(tool_call, verbose=args.verbose)
 
@@ -53,8 +68,11 @@ def main():
 
             if args.verbose:
                 print(f"-> {result_message['content']}")
-    else:
-        print(message.content)
+
+            messages.append(result_message)
+
+    print(f"Error: reached the maximum of {MAX_ITERATIONS} iterations without a final response.")
+    sys.exit(1)
 
 
 if __name__ == "__main__":
